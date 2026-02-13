@@ -1,0 +1,185 @@
+local Player = game:GetService("Players").LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- UI erstellen
+local Gui = Instance.new("ScreenGui")
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 280, 0, 180)
+Main.Position = UDim2.new(0.5, -140, 0.5, -90)
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Main.BackgroundTransparency = 0.25
+Main.BorderSizePixel = 0
+Main.Active = true
+
+-- Abgerundete Ecken
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 14)
+Corner.Parent = Main
+
+-- Schatten um das UI
+local Shadow = Instance.new("ImageLabel")
+Shadow.Size = UDim2.new(1, 24, 1, 24)
+Shadow.Position = UDim2.new(0, -12, 0, -12)
+Shadow.BackgroundTransparency = 1
+Shadow.Image = "rbxassetid://6010261993"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.8
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+Shadow.Parent = Main
+
+-- Blur Effekt für den Inhalt hinter dem UI
+local BlurEffect = Instance.new("BlurEffect")
+BlurEffect.Size = 6
+BlurEffect.Parent = game:GetService("Lighting")
+
+-- Titel
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -20, 0, 40)
+Title.Position = UDim2.new(0, 10, 0, 5)
+Title.BackgroundTransparency = 1
+Title.Text = "Steal A Brainrot\nAuto Moreira V1"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.TextYAlignment = Enum.TextYAlignment.Center
+Title.Parent = Main
+
+-- Start Button
+local StartBtn = Instance.new("TextButton")
+StartBtn.Size = UDim2.new(1, -30, 0, 30)
+StartBtn.Position = UDim2.new(0, 15, 0, 55)
+StartBtn.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+StartBtn.BackgroundTransparency = 0.2
+StartBtn.Text = "Start Auto Moreira"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.TextSize = 12
+StartBtn.Font = Enum.Font.GothamBold
+StartBtn.AutoButtonColor = false
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 8)
+BtnCorner.Parent = StartBtn
+StartBtn.Parent = Main
+
+-- Loading Bar
+local LoadBg = Instance.new("Frame")
+LoadBg.Size = UDim2.new(1, -30, 0, 4)
+LoadBg.Position = UDim2.new(0, 15, 0, 95)
+LoadBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+LoadBg.BackgroundTransparency = 0.6
+LoadBg.BorderSizePixel = 0
+
+local LoadBgCorner = Instance.new("UICorner")
+LoadBgCorner.CornerRadius = UDim.new(1, 0)
+LoadBgCorner.Parent = LoadBg
+
+local LoadBar = Instance.new("Frame")
+LoadBar.Size = UDim2.new(0, 0, 1, 0)
+LoadBar.BackgroundColor3 = Color3.fromRGB(0, 175, 255)
+LoadBar.BackgroundTransparency = 0.3
+LoadBar.BorderSizePixel = 0
+LoadBar.Parent = LoadBg
+
+local LoadCorner = Instance.new("UICorner")
+LoadCorner.CornerRadius = UDim.new(1, 0)
+LoadCorner.Parent = LoadBar
+LoadBg.Parent = Main
+
+-- Status
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, -30, 0, 18)
+Status.Position = UDim2.new(0, 15, 0, 103)
+Status.BackgroundTransparency = 1
+Status.Text = "Ready to start..."
+Status.TextColor3 = Color3.fromRGB(220, 220, 220)
+Status.TextSize = 10
+Status.Font = Enum.Font.Gotham
+Status.Parent = Main
+
+-- Auto Block
+local AutoBlock = Instance.new("TextButton")
+AutoBlock.Size = UDim2.new(1, -30, 0, 20)
+AutoBlock.Position = UDim2.new(0, 15, 1, -30)
+AutoBlock.BackgroundTransparency = 1
+AutoBlock.Text = "Auto Block: ON"
+AutoBlock.TextColor3 = Color3.fromRGB(76, 175, 80)
+AutoBlock.TextSize = 10
+AutoBlock.Font = Enum.Font.GothamBold
+AutoBlock.TextXAlignment = Enum.TextXAlignment.Left
+AutoBlock.Parent = Main
+
+Main.Parent = Gui
+Gui.Parent = Player:WaitForChild("PlayerGui")
+
+-- Funktionen
+local blockOn = true
+local isRunning = false
+
+StartBtn.MouseButton1Click:Connect(function()
+    if isRunning then return end
+    isRunning = true
+    
+    StartBtn.Text = "Starting..."
+    StartBtn.BackgroundColor3 = Color3.fromRGB(255, 152, 0)
+    
+    spawn(function()
+        local startTime = tick()
+        local duration = 5
+        
+        while tick() - startTime < duration do
+            local progress = (tick() - startTime) / duration
+            LoadBar.Size = UDim2.new(progress, 0, 1, 0)
+            wait(0.03)
+        end
+        
+        LoadBar.Size = UDim2.new(1, 0, 1, 0)
+        StartBtn.Text = "Waiting for Bot..."
+        StartBtn.BackgroundColor3 = Color3.fromRGB(33, 150, 243)
+        Status.Text = "Bot is processing..."
+    end)
+end)
+
+AutoBlock.MouseButton1Click:Connect(function()
+    blockOn = not blockOn
+    if blockOn then
+        AutoBlock.Text = "Auto Block: ON"
+        AutoBlock.TextColor3 = Color3.fromRGB(76, 175, 80)
+    else
+        AutoBlock.Text = "Auto Block: OFF" 
+        AutoBlock.TextColor3 = Color3.fromRGB(244, 67, 54)
+    end
+end)
+
+-- Drag Funktion
+local dragging = false
+local dragStart, startPos
+
+Main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+    end
+end)
+
+Main.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Cleanup
+Gui.Destroying:Connect(function()
+    BlurEffect:Destroy()
+end)
+
+print("Steal A Brainrot UI loaded!")
