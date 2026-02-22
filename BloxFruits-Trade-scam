@@ -1,0 +1,331 @@
+-- claude wrote it, still sexy visual eeee
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TradeHelperUI"
+screenGui.Parent = playerGui
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 280, 0, 160)
+mainFrame.Position = UDim2.new(0.5, -140, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = false
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+local shadow = Instance.new("Frame")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(1, 6, 1, 6)
+shadow.Position = UDim2.new(0, -3, 0, -3)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.6
+shadow.BorderSizePixel = 0
+shadow.ZIndex = mainFrame.ZIndex - 1
+shadow.Parent = mainFrame
+
+local shadowCorner = Instance.new("UICorner")
+shadowCorner.CornerRadius = UDim.new(0, 15)
+shadowCorner.Parent = shadow
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
+}
+gradient.Rotation = 45
+gradient.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "Title"
+titleLabel.Size = UDim2.new(1, -20, 0, 30)
+titleLabel.Position = UDim2.new(0, 10, 0, 8)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Trade Scam Freeze"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextScaled = true
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "Status"
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 0, 35)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Not in trade"
+statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Parent = mainFrame
+
+local function createToggle(name, position, enabled)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Name = name .. "Toggle"
+    toggleFrame.Size = UDim2.new(0, 240, 0, 35)
+    toggleFrame.Position = position
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.Parent = mainFrame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = toggleFrame
+    
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(0, 140, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = enabled and Color3.fromRGB(100, 255, 150) or Color3.fromRGB(180, 180, 180)
+    label.TextScaled = true
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = toggleFrame
+    
+    local switch = Instance.new("Frame")
+    switch.Name = "Switch"
+    switch.Size = UDim2.new(0, 60, 0, 22)
+    switch.Position = UDim2.new(1, -70, 0.5, -11)
+    switch.BackgroundColor3 = enabled and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(60, 60, 75)
+    switch.BorderSizePixel = 0
+    switch.Parent = toggleFrame
+    
+    local switchCorner = Instance.new("UICorner")
+    switchCorner.CornerRadius = UDim.new(0, 11)
+    switchCorner.Parent = switch
+    
+    local knob = Instance.new("Frame")
+    knob.Name = "Knob"
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = enabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = switch
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(0, 9)
+    knobCorner.Parent = knob
+    
+    local button = Instance.new("TextButton")
+    button.Name = "Button"
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundTransparency = 1
+    button.Text = ""
+    button.Parent = toggleFrame
+    
+    return {
+        frame = toggleFrame,
+        switch = switch,
+        knob = knob,
+        label = label,
+        button = button,
+        enabled = enabled
+    }
+end
+
+local freezeToggle = createToggle("Freeze Trade", UDim2.new(0, 20, 0, 65), false)
+local forceToggle = createToggle("Force Accept", UDim2.new(0, 20, 0, 110), false)
+
+local inTrade = false
+local tradingPartner = ""
+local tradeConnection
+
+local function animateToggle(toggle, enabled)
+    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    local switchTween = TweenService:Create(toggle.switch, tweenInfo, {
+        BackgroundColor3 = enabled and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(60, 60, 75)
+    })
+    
+    local knobTween = TweenService:Create(toggle.knob, tweenInfo, {
+        Position = enabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    })
+    
+    local labelTween = TweenService:Create(toggle.label, tweenInfo, {
+        TextColor3 = enabled and Color3.fromRGB(100, 255, 150) or Color3.fromRGB(180, 180, 180)
+    })
+    
+    switchTween:Play()
+    knobTween:Play()
+    labelTween:Play()
+end
+
+local function showNotification(text, color)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 200, 0, 40)
+    notif.Position = UDim2.new(0.5, -100, 1, 10)
+    notif.BackgroundColor3 = color or Color3.fromRGB(200, 50, 50)
+    notif.BorderSizePixel = 0
+    notif.Parent = mainFrame
+    
+    local notifCorner = Instance.new("UICorner")
+    notifCorner.CornerRadius = UDim.new(0, 8)
+    notifCorner.Parent = notif
+    
+    local notifText = Instance.new("TextLabel")
+    notifText.Size = UDim2.new(1, -10, 1, 0)
+    notifText.Position = UDim2.new(0, 5, 0, 0)
+    notifText.BackgroundTransparency = 1
+    notifText.Text = text
+    notifText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    notifText.TextScaled = true
+    notifText.Font = Enum.Font.Gotham
+    notifText.Parent = notif
+    
+    local showTween = TweenService:Create(notif, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -100, 1, -50)})
+    showTween:Play()
+    
+    wait(2)
+    
+    local hideTween = TweenService:Create(notif, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -100, 1, 10)})
+    hideTween:Play()
+    hideTween.Completed:Connect(function()
+        notif:Destroy()
+    end)
+end
+
+local function checkTradeStatus()
+    local playerGui = player.PlayerGui
+    local mainGui = playerGui:FindFirstChild("Main")
+    if not mainGui then return false, "" end
+    
+    local tradeFrame = mainGui:FindFirstChild("Trade")
+    if not tradeFrame or not tradeFrame.Visible then return false, "" end
+
+    local container = tradeFrame:FindFirstChild("Container")
+    if not container then return false, "" end
+    
+    local frame1 = container:FindFirstChild("1")
+    local frame2 = container:FindFirstChild("2")
+    if not frame1 or not frame2 then return false, "" end
+
+    local player1Label = frame1:FindFirstChild("TextLabel")
+    local player2Label = frame2:FindFirstChild("TextLabel")
+    if not player1Label or not player2Label then return false, "" end
+
+    local localPlayerName = string.lower(player.Name)
+    local localPlayerDisplay = string.lower(player.DisplayName)
+    local player1Name = string.lower(player1Label.Text)
+    local player2Name = string.lower(player2Label.Text)
+    
+    local tradingPartnerName
+    if player1Name == localPlayerName or player1Name == localPlayerDisplay then
+        tradingPartnerName = player2Name
+    elseif player2Name == localPlayerName or player2Name == localPlayerDisplay then
+        tradingPartnerName = player1Name
+    else
+        return false, ""
+    end
+    
+    return true, tradingPartnerName
+end
+
+local function updateUI()
+    local isInTrade, partner = checkTradeStatus()
+    
+    if isInTrade ~= inTrade then
+        inTrade = isInTrade
+        tradingPartner = partner
+        
+        if inTrade then
+            statusLabel.Text = "Victim: " .. partner
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
+        else
+            statusLabel.Text = "Not in trade"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            
+            if freezeToggle.enabled then
+                freezeToggle.enabled = false
+                animateToggle(freezeToggle, false)
+            end
+            if forceToggle.enabled then
+                forceToggle.enabled = false
+                animateToggle(forceToggle, false)
+            end
+        end
+    end
+end
+
+freezeToggle.button.MouseButton1Click:Connect(function()
+    if not inTrade then
+        spawn(function()
+            showNotification("You need to be in a trade!")
+        end)
+        return
+    end
+    
+    freezeToggle.enabled = not freezeToggle.enabled
+    animateToggle(freezeToggle, freezeToggle.enabled)
+end)
+
+forceToggle.button.MouseButton1Click:Connect(function()
+    if not inTrade then
+        spawn(function()
+            showNotification("You need to be in a trade!")
+        end)
+        return
+    end
+    
+    forceToggle.enabled = not forceToggle.enabled
+    animateToggle(forceToggle, forceToggle.enabled)
+end)
+
+local isDragging = false
+local dragStart = nil
+local startPos = nil
+
+local function startDrag(input)
+    isDragging = true
+    dragStart = input.Position
+    startPos = mainFrame.Position
+end
+
+local function updateDrag(input)
+    if isDragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end
+
+local function endDrag()
+    isDragging = false
+end
+
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        updateDrag(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        endDrag()
+    end
+end)
+
+tradeConnection = RunService.Heartbeat:Connect(updateUI)
+
+local showTween = TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 280, 0, 160)
+})
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+showTween:Play()
