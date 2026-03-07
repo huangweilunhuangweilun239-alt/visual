@@ -1,0 +1,200 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local task = task
+
+local player = Players.LocalPlayer
+local parentGui
+local ok, cg = pcall(function() return game:GetService("CoreGui") end)
+parentGui = (ok and cg) or player:WaitForChild("PlayerGui")
+
+-- Cleanup
+if parentGui:FindFirstChild("BaiyanScriptsUI") then
+    parentGui.BaiyanScriptsUI:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BaiyanScriptsUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = parentGui
+
+-- ===== MAIN FRAME =====
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 280, 0, 190)
+main.Position = UDim2.new(0.62, 0, 0.12, 0)
+main.BackgroundColor3 = Color3.fromRGB(5,25,5)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = screenGui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,16)
+
+-- ===== BORDER =====
+local stroke = Instance.new("UIStroke", main)
+stroke.Thickness = 3
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local gradient = Instance.new("UIGradient", stroke)
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0,255,0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120,255,160)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,255,0))
+}
+
+task.spawn(function()
+    while gradient.Parent do
+        gradient.Rotation = (gradient.Rotation + 2) % 360
+        task.wait(0.05)
+    end
+end)
+
+-- ===== TITLE (RED MAKUSCRIPTS) =====
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, -20, 0, 50)
+title.Position = UDim2.new(0, 10, 0, 6)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextWrapped = true
+title.RichText = true
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextYAlignment = Enum.TextYAlignment.Top
+title.Text =
+    "Auto Donate Robux Script\nMade by <font color=\"rgb(255,80,80)\">BaiyanScripts</font>"
+title.TextColor3 = Color3.fromRGB(80,255,120)
+title.Parent = main
+
+-- ===== PREMIUM BYPASS =====
+local instantBg = Instance.new("Frame", main)
+instantBg.Size = UDim2.new(1,-20,0,46)
+instantBg.Position = UDim2.new(0,10,0,60)
+instantBg.BackgroundColor3 = Color3.fromRGB(10,40,10)
+Instance.new("UICorner", instantBg).CornerRadius = UDim.new(0,12)
+
+local instantBtn = Instance.new("TextButton", instantBg)
+instantBtn.Size = UDim2.new(1,0,1,0)
+instantBtn.BackgroundTransparency = 1
+instantBtn.Font = Enum.Font.GothamBold
+instantBtn.Text = "Premium Bypass"
+instantBtn.TextSize = 18
+instantBtn.TextColor3 = Color3.fromRGB(120,255,120)
+
+-- ===== STATUS =====
+local statusLabel = Instance.new("TextLabel", main)
+statusLabel.Size = UDim2.new(1,-20,0,18)
+statusLabel.Position = UDim2.new(0,10,0,110)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.Text = "Status: OFF"
+statusLabel.TextColor3 = Color3.fromRGB(150,255,150)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ===== BOTTOM =====
+local bottom = Instance.new("Frame", main)
+bottom.Size = UDim2.new(1,-20,0,45)
+bottom.Position = UDim2.new(0,10,0,134)
+bottom.BackgroundTransparency = 1
+
+-- ===== CONTROL ALL =====
+local bringFrame = Instance.new("Frame", bottom)
+bringFrame.Size = UDim2.new(0.48,0,1,0)
+bringFrame.BackgroundColor3 = Color3.fromRGB(10,40,10)
+Instance.new("UICorner", bringFrame).CornerRadius = UDim.new(0,10)
+
+local bringBtn = Instance.new("TextButton", bringFrame)
+bringBtn.Size = UDim2.new(1,0,1,0)
+bringBtn.BackgroundTransparency = 1
+bringBtn.Font = Enum.Font.GothamBold
+bringBtn.Text = "Control All"
+bringBtn.TextSize = 15
+bringBtn.TextColor3 = Color3.fromRGB(120,255,120)
+
+-- ===== MOZIL =====
+local mozilFrame = Instance.new("Frame", bottom)
+mozilFrame.Size = UDim2.new(0.48,0,1,0)
+mozilFrame.Position = UDim2.new(0.52,0,0,0)
+mozilFrame.BackgroundColor3 = Color3.fromRGB(5,35,5)
+Instance.new("UICorner", mozilFrame).CornerRadius = UDim.new(0,10)
+
+local mozilBtn = Instance.new("TextButton", mozilFrame)
+mozilBtn.Size = UDim2.new(1,0,1,0)
+mozilBtn.BackgroundTransparency = 1
+mozilBtn.Font = Enum.Font.GothamBold
+mozilBtn.Text = "Baiyan Auto Donate"
+mozilBtn.TextSize = 15
+mozilBtn.TextColor3 = Color3.fromRGB(180,255,180)
+
+-- ===== TOGGLE LOGO =====
+local toggle = Instance.new("ImageButton", screenGui)
+toggle.Size = UDim2.new(0,56,0,56)
+toggle.Position = UDim2.new(0.02,0,0.4,0)
+toggle.Image = "rbxassetid://117995088410104"
+toggle.BackgroundColor3 = Color3.fromRGB(5,15,5)
+toggle.AutoButtonColor = false
+Instance.new("UICorner", toggle).CornerRadius = UDim.new(1,0)
+
+-- ===== STATES & VISUAL FEEDBACK =====
+local instantOn = false
+local bringOn = false
+
+local function setInstant(on)
+    instantOn = on
+    statusLabel.Text = on and "Status: ON" or "Status: OFF"
+
+    TweenService:Create(instantBg, TweenInfo.new(0.15), {
+        BackgroundColor3 = on and Color3.fromRGB(0,120,0) or Color3.fromRGB(10,40,10)
+    }):Play()
+
+    instantBtn.TextColor3 = on and Color3.fromRGB(40,255,80) or Color3.fromRGB(120,255,120)
+end
+
+local function setBring(on)
+    bringOn = on
+
+    TweenService:Create(bringFrame, TweenInfo.new(0.15), {
+        BackgroundColor3 = on and Color3.fromRGB(0,120,0) or Color3.fromRGB(10,40,10)
+    }):Play()
+
+    bringBtn.TextColor3 = on and Color3.fromRGB(40,255,80) or Color3.fromRGB(120,255,120)
+
+    if on then
+        task.spawn(function()
+            while bringOn do
+                local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if myHRP then
+                    for _, p in pairs(Players:GetPlayers()) do
+                        if p ~= player and p.Character then
+                            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                hrp.CFrame = myHRP.CFrame * CFrame.new(math.random(-2,2),0,math.random(-2,2))
+                            end
+                        end
+                    end
+                end
+                task.wait(0.12)
+            end
+        end)
+    end
+end
+
+-- ===== EVENTS =====
+instantBtn.MouseButton1Click:Connect(function()
+    setInstant(not instantOn)
+end)
+
+bringBtn.MouseButton1Click:Connect(function()
+    setBring(not bringOn)
+end)
+
+toggle.MouseButton1Click:Connect(function()
+    main.Visible = not main.Visible
+end)
+
+-- ===== MOZIL SCRIPT =====
+local MOZIL_URL = "https://raw.githubusercontent.com/Baiyanscript/visual/refs/heads/main/BaiyanscriptV4"
+
+mozilBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet(MOZIL_URL))()
+    end)
+end)
