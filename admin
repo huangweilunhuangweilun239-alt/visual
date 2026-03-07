@@ -1,0 +1,855 @@
+-- Baiyan Admin Command UI (Net RF/RE edition)
+-- YÃªu cáº§u: ReplicatedStorage/Packages/Net vá»›i cÃ¡c RF/RE sau:
+-- RF/AdminService/SpawnBrainrot
+-- RF/AdminService/SpawnBrainrotInBase
+-- RF/AdminService/StartEvent
+-- RF/AdminService/GiveMoney
+-- RF/AdminService/GiveRebirth
+-- RF/AdminService/Morph
+-- RE/AdminService/PlayerMorph
+-- (tuá»³ game) RF/AdminService/StopEvent  -- náº¿u cÃ³, nÃºt Stop Event sáº½ dÃ¹ng, náº¿u khÃ´ng sáº½ bÃ¡o thiáº¿u
+
+local _store = getgenv()
+_store.Baiyan_POS = _store.Baiyan_POS or {
+  toggle = UDim2.fromOffset(60, 220),
+  main   = UDim2.fromOffset(240, 120),
+  spawner= UDim2.fromOffset(840, 100),
+  event  = UDim2.fromOffset(840, 310),
+  lucky  = UDim2.fromOffset(840, 520),
+  add    = UDim2.fromOffset(560, 310),
+  morph  = UDim2.fromOffset(560, 520),
+}
+local POS = _store.Baiyan_POS
+local function savePos(key, guiObj)
+  if key and guiObj then _store.Baiyan_POS[key] = guiObj.Position end
+end
+
+---------------- Services / Net RF/RE ----------------
+local RS  = game:GetService("ReplicatedStorage")
+local CG  = game:GetService("CoreGui")
+local UIS = game:GetService("UserInputService")
+local RunS = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local HttpService  = game:GetService("HttpService")
+
+local Net = RS:WaitForChild("Packages"):WaitForChild("Net")
+local RF_SpawnBrainrot        = Net:WaitForChild("RF/AdminService/SpawnBrainrot")
+local RF_SpawnBrainrotInBase  = Net:WaitForChild("RF/AdminService/SpawnBrainrotInBase")
+local RF_StartEvent           = Net:WaitForChild("RF/AdminService/StartEvent")
+local RF_GiveMoney            = Net:WaitForChild("RF/AdminService/GiveMoney")
+local RF_GiveRebirth          = Net:WaitForChild("RF/AdminService/GiveRebirth")
+local RF_Morph                = Net:WaitForChild("RF/AdminService/Morph")
+local RE_PlayerMorph          = Net:WaitForChild("RE/AdminService/PlayerMorph")
+
+---------------- Helpers ----------------
+local function r8(o)  local c=Instance.new("UICorner",o); c.CornerRadius=UDim.new(0,8);  return c end
+local function r12(o) local c=Instance.new("UICorner",o); c.CornerRadius=UDim.new(0,12); return c end
+local function stroke(o,a) local s=Instance.new("UIStroke",o); s.Transparency=a or 0.6; s.Color=Color3.fromRGB(255,255,255); s.Thickness=1; s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; return s end
+local function glass(o) o.BackgroundColor3=Color3.fromRGB(23,25,33); o.BackgroundTransparency=0.05; stroke(o,0.7)
+  local g=Instance.new("UIGradient",o); g.Rotation=90
+  g.Color=ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(35,38,50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(18,19,25))
+  }
+end
+local function mkLabel(parent, text, size, y, bold, center)
+  local l=Instance.new("TextLabel", parent)
+  l.Size=UDim2.new(1,-20,0,size+10); l.Position=UDim2.fromOffset(10,y or 0)
+  l.BackgroundTransparency=1; l.Text=text
+  l.Font=bold and Enum.Font.GothamSemibold or Enum.Font.Gotham
+  l.TextSize=size; l.TextColor3=Color3.fromRGB(235,240,255)
+  l.TextXAlignment = center and Enum.TextXAlignment.Center or Enum.TextXAlignment.Left
+  return l
+end
+local function padL(o,px) local p=Instance.new("UIPadding",o); p.PaddingLeft=UDim.new(0,px or 8) return p end
+local function parseNumber(txt) txt=tostring(txt or ""):gsub("[^%d%-%.]",""); return tonumber(txt) end
+
+-- drag á»•n Ä‘á»‹nh mobile
+local function pointerInGuiSpace(target)
+  local p = UIS:GetMouseLocation()
+  local inset = GuiService:GetGuiInset()
+  local sg = target:FindFirstAncestorWhichIsA("ScreenGui")
+  if sg and sg.IgnoreGuiInset == false then
+    return Vector2.new(p.X - inset.X, p.Y - inset.Y)
+  else
+    return Vector2.new(p.X, p.Y)
+  end
+end
+local function clampToParent(target, absX, absY)
+  local parent = target.Parent
+  local ox, oy = 0, 0
+  if parent and parent.AbsolutePosition then
+    local ap = parent.AbsolutePosition
+    ox, oy = ap.X, ap.Y
+  end
+  local pw, ph = parent.AbsoluteSize.X, parent.AbsoluteSize.Y
+  local tw, th = target.AbsoluteSize.X, target.AbsoluteSize.Y
+  local minX, minY = ox, oy
+  local maxX, maxY = ox + pw - tw, oy + ph - th
+  local cy = math.clamp(absY, minY, math.max(minY, maxY))
+  return UDim2.fromOffset(cx - ox, cy - oy)
+  opts = opts or {}
+  local DEADZONE = opts.deadzone or 6
+  local HOLD_MS  = opts.hold_ms  or 0
+  handle.Active, target.Active = true, true
+  local dragging, candidate = false, false
+  local startTime = 0
+  local offsetAbs = Vector2.zero
+  local stepConn
+  local function stopDrag()
+    dragging = false; candidate = false
+    if stepConn then stepConn:Disconnect(); stepConn = nil end
+    if opts and opts.onRelease then opts.onRelease() end
+  end
+  handle.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1
+    and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    candidate = true; dragging = false; startTime = os.clock()
+    local ptr = pointerInGuiSpace(target)
+    offsetAbs = target.AbsolutePosition - ptr
+    if stepConn then stepConn:Disconnect() end
+    stepConn = RunS.RenderStepped:Connect(function()
+      if not candidate then return end
+      local now = os.clock()
+      local ptrNow = pointerInGuiSpace(target)
+      if not dragging then
+        local expected = target.AbsolutePosition - offsetAbs
+        local dx = math.abs(ptrNow.X - expected.X)
+        local dy = math.abs(ptrNow.Y - expected.Y)
+        local held = (now - startTime) * 1000 >= HOLD_MS
+        if held or dx > DEADZONE or dy > DEADZONE then dragging = true else return end
+      end
+      local absX = ptrNow.X + offsetAbs.X
+      local absY = ptrNow.Y + offsetAbs.Y
+      target.Position = clampToParent(target, absX, absY)
+    end)
+    input.Changed:Connect(function()
+      if input.UserInputState == Enum.UserInputState.End
+      or input.UserInputState == Enum.UserInputState.Cancel then stopDrag() end
+    end)
+  end)
+  UIS.TouchEnded:Connect(function() stopDrag() end)
+end
+local function ensureVisible(win, key)
+  task.defer(function()
+    if not win or not win.Parent then return end
+    local p = win.AbsolutePosition
+    win.Position = clampToParent(win, p.X, p.Y)
+    if key then savePos(key, win) end
+  end)
+end
+
+-- mutation: "" hoáº·c "Normal" -> ""
+local function normalizeMutationEmpty(s)
+    s = tostring(s or ""):match("^%s*(.-)%s*$")
+    if s == "" or s:lower() == "normal" then
+
+-- Traits dropdown (multi-select) â€“ nÃºt cÃ³ viá»n tráº¯ng Ä‘á»“ng bá»™ pill, panel khÃ´ng viá»n
+local function AttachTraitsDropdown(win, opts)
+  local PADDING = 10
+  local BTN_H   = 32
+  local y0      = (opts and opts.y) or 138
+  local z       = (opts and opts.z) or 22
+  local baseH   = (opts and opts.baseHeight) or win.Size.Y.Offset
+  local panelH  = math.clamp((opts and opts.panelH) or 160, 120, 220)
+
+  local btn = Instance.new("TextButton")
+  btn.Name = "TraitsBtn"
+  btn.Parent = win
+  btn.AnchorPoint = Vector2.new(0, 0)
+  btn.Position = UDim2.fromOffset(PADDING, y0)
+  btn.Size     = UDim2.new(1, -2*PADDING, 0, BTN_H)
+  btn.Text = "Traits (0)"
+  btn.Font = Enum.Font.Gotham
+  btn.TextSize = 16
+  btn.TextColor3 = Color3.fromRGB(235, 240, 255)
+  btn.AutoButtonColor = true
+  btn.BackgroundColor3 = Color3.fromRGB(31, 33, 44)
+  btn.ZIndex = z
+  r10 = r8(btn); stroke(btn,0.6)
+
+  local panel = Instance.new("Frame")
+  panel.Name = "TraitsPanel"
+  panel.Parent = win
+  panel.AnchorPoint = Vector2.new(0, 0)
+  panel.Position = UDim2.fromOffset(PADDING, y0 + BTN_H + 4)
+  panel.Size = UDim2.new(1, -2*PADDING, 0, 0)
+  panel.BackgroundColor3 = Color3.fromRGB(22,24,28)
+  panel.BackgroundTransparency = 1
+  panel.Visible = false
+  panel.ClipsDescendants = true
+  panel.ZIndex = z
+  r12(panel)
+  local pad = Instance.new("UIPadding", panel)
+  pad.PaddingTop = UDim.new(0, 6)
+  pad.PaddingBottom = UDim.new(0, 6)
+  pad.PaddingLeft = UDim.new(0, 6)
+  pad.PaddingRight = UDim.new(0, 6)
+
+  local scroll = Instance.new("ScrollingFrame")
+  scroll.Parent = panel
+  scroll.Size = UDim2.new(1, 0, 1, 0)
+  scroll.BackgroundTransparency = 1
+  scroll.ScrollBarThickness = 5
+  scroll.ZIndex = z
+
+  local list = Instance.new("UIListLayout")
+  list.Parent = scroll
+  list.SortOrder = Enum.SortOrder.LayoutOrder
+  list.Padding = UDim.new(0, 6)
+  local function refreshCanvas()
+    task.wait()
+    scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y + 8)
+  end
+  list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshCanvas)
+
+  -- thÃªm "All" á»Ÿ Ä‘áº§u
+    "All","Taco","Nyan","Galactic","Fireworks","Zombie","Claws","Glitched","Bubblegum","Fire","Wet",
+    "Snowy","Explosive","Disco","10B","Shark Fin","Matteo Hat","Brazil","Sleepy",
+    "Lightning","UFO","Spider","Strawberry","Paint","Skeleton","Sombrero","Tie","Witch Hat",
+    "Indonesia","Meowl",
+  }
+
+  local selected = {}
+  local function countSel() local n=0 for _,v in pairs(selected) do if v then n+=1 end end return n end
+  local function refreshBtn() btn.Text = ("Traits (%d)"):format(countSel()) end
+
+  local items={}
+  local function setAll(state)
+    for _,it in ipairs(items) do
+      local nm = it.Name:sub(7)
+      selected[nm] = state
+      it.BackgroundTransparency = state and 0.05 or 0.25
+      local mark = it:FindFirstChild("Mark")
+      if mark then mark.Text = state and "âœ…" or "" end
+    end
+    refreshBtn()
+  end
+
+  local function makeItem(name)
+    local it = Instance.new("Frame")
+    it.Name = "Trait_"..name
+    it.Parent = scroll
+    it.Size = UDim2.new(1, -8, 0, 30)
+    it.Position = UDim2.fromOffset(4, 0)
+    it.BackgroundColor3 = Color3.fromRGB(30, 32, 36)
+    it.BackgroundTransparency = 0.25
+    it.ZIndex = z
+    r8(it)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = it
+    lbl.BackgroundTransparency = 1
+    lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.Size = UDim2.new(1, -56, 1, 0)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 16
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Text = name
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 235)
+    lbl.ZIndex = z
+
+    local mark = Instance.new("TextLabel")
+    mark.Name = "Mark"
+    mark.Parent = it
+    mark.BackgroundTransparency = 1
+    mark.Size = UDim2.new(0, 28, 1, 0)
+    mark.Position = UDim2.new(1, -32, 0, 0)
+    mark.Font = Enum.Font.GothamBold
+    mark.TextSize = 18
+    mark.Text = ""
+    mark.TextColor3 = Color3.fromRGB(140, 235, 140)
+    mark.ZIndex = z
+
+    local hit = Instance.new("TextButton")
+    hit.Parent = it
+    hit.BackgroundTransparency = 1
+    hit.Size = UDim2.new(1, 0, 1, 0)
+    hit.Text = ""
+    hit.ZIndex = z
+    hit.Activated:Connect(function()
+        selected["All"] = turnOn
+        setAll(turnOn)
+        return
+      it.BackgroundTransparency = selected[nm] and 0.05 or 0.25
+      mark.Text = selected[nm] and "âœ…" or ""
+      -- náº¿u má»i cÃ¡i (trá»« All) Ä‘á»u báº­t -> báº­t All; náº¿u cÃ³ cÃ¡i táº¯t -> táº¯t All
+      local allOn = true
+      for _,tname in ipairs(TRAIT_LIST) do
+        if tname ~= "All" then
+          if not selected[tname] then allOn=false break end
+        end
+      end
+      selected["All"] = allOn
+      refreshBtn()
+    end)
+
+    table.insert(items, it)
+  end
+
+  for _, t in ipairs(TRAIT_LIST) do makeItem(t) end
+  refreshCanvas()
+
+  local isOpen = false
+  local function openPanel()
+    isOpen = true
+    panel.Visible = true
+    panel.BackgroundTransparency = 1
+    TweenService:Create(win, TweenInfo.new(0.20, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+      { Size = UDim2.new(0, win.Size.X.Offset, 0, baseH + panelH + 6) }):Play()
+    local grow = TweenService:Create(panel, TweenInfo.new(0.20, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+      { Size = UDim2.new(1, 0, 0, panelH) })
+    grow:Play()
+    grow.Completed:Once(function()
+      TweenService:Create(panel, TweenInfo.new(0.10), { BackgroundTransparency = 0.08 }):Play()
+      for i, it in ipairs(items) do
+        it.BackgroundTransparency = 1
+        for _, ch in ipairs(it:GetChildren()) do
+          if ch:IsA("TextLabel") then ch.TextTransparency = 1 end
+        end
+        task.delay((i-1)*0.012, function()
+          local nm = it:FindFirstChildWhichIsA("TextLabel").Text
+          local wanted = selected[nm] and 0.05 or 0.25
+          TweenService:Create(it, TweenInfo.new(0.12), { BackgroundTransparency = wanted }):Play()
+          for _, ch in ipairs(it:GetChildren()) do
+            if ch:IsA("TextLabel") then
+              TweenService:Create(ch, TweenInfo.new(0.12), { TextTransparency = 0 }):Play()
+            end
+          end
+        end)
+      end
+    end)
+  end
+  local function closePanel()
+    isOpen = false
+    TweenService:Create(panel, TweenInfo.new(0.10), { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(panel, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+    TweenService:Create(win, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+      { Size = UDim2.new(0, win.Size.X.Offset, 0, baseH) }):Play()
+
+
+
+
+
+
+main.Size=UDim2.fromOffset(340, 320)  -- tÄƒng chiá»u cao Ä‘á»ƒ cÃ³ thÃªm hÃ ng Verified/Morph
+
+mainDrag.Size=UDim2.new(1,0,0,44)
+mainDrag.BackgroundTransparency=1
+mainDrag.ZIndex = 999
+addDrag(mainDrag, main, {deadzone=6, hold_ms=0, onRelease=function() savePos("main", main) end})
+addDrag(main,     main, {deadzone=6, hold_ms=0})
+
+mkLabel(main, "Admin Command Script", 22, 8, true, true).ZIndex=11
+
+local status = Instance.new("TextLabel", main)
+status.Size=UDim2.new(1,-20,0,14); status.Position=UDim2.fromOffset(10,40)
+status.BackgroundTransparency=1; status.Font=Enum.Font.Code; status.TextSize=12
+status.TextXAlignment=Enum.TextXAlignment.Left; status.TextColor3=Color3.fromRGB(180,200,230)
+status.Text = "Made By Baiyan";  status.ZIndex=11
+local function ok(m) status.TextColor3=Color3.fromRGB(160,240,160); status.Text="âœ… "..m end
+local function er(m) status.TextColor3=Color3.fromRGB(255,140,140); status.Text="âŒ "..m end
+
+local function mkBtn(parent, pos, size, text, bg, z)
+  local b=Instance.new("TextButton", parent)
+  b.Position=pos; b.Size=size; b.Text=text; b.ZIndex=z or 11
+  b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.TextColor3=Color3.fromRGB(235,240,255)
+  b.BackgroundColor3=bg or Color3.fromRGB(54,62,86); r8(b); stroke(b,0.45); return b
+end
+
+-- layout
+local leftX, rightX = 10, 10+main.Size.X.Offset/2
+local row1Y, row2Y, row3Y, row4Y = 56, 98, 140, 182
+local moneyY, rebirthY = 224, 266
+
+local openSpawner   = mkBtn(main, UDim2.fromOffset(leftX, row1Y),  UDim2.new(0.5,-15,0,36), "ðŸ§   Brainrot Spawner",  Color3.fromRGB(112,100,255))
+local openAdd       = mkBtn(main, UDim2.fromOffset(rightX,row1Y),  UDim2.new(0.5,-15,0,36), "ðŸ“  Add Brainrot",      Color3.fromRGB(86,130,170))
+local openEvent     = mkBtn(main, UDim2.fromOffset(leftX, row2Y),  UDim2.new(0.5,-15,0,36), "ðŸŽ‰  Execute Event",      Color3.fromRGB(86,98,170))
+local openLucky     = mkBtn(main, UDim2.fromOffset(rightX,row2Y),  UDim2.new(0.5,-15,0,36), "ðŸ€  Lucky Block Spawner",Color3.fromRGB(72,130,100))
+local execAll       = mkBtn(main, UDim2.fromOffset(leftX, row3Y),  UDim2.new(0.5,-15,0,36), "âš¡  Execute All Events")
+local stopEventBtn  = mkBtn(main, UDim2.fromOffset(rightX,row3Y),  UDim2.new(0.5,-15,0,36), "ðŸ”´  Stop Event",         Color3.fromRGB(150,70,70))
+local verifiedBtn   = mkBtn(main, UDim2.fromOffset(leftX, row4Y),  UDim2.new(0.5,-15,0,36), "âœ…  Verified",           Color3.fromRGB(78,120,92))
+local openMorph     = mkBtn(main, UDim2.fromOffset(rightX,row4Y),  UDim2.new(0.5,-15,0,36), "ðŸ§¬  Brainrot Morph",     Color3.fromRGB(90,100,160))
+
+moneyBox.Size=UDim2.new(0.5,-15,0,34); moneyBox.Position=UDim2.fromOffset(leftX, moneyY)
+moneyBox.Text=""; moneyBox.PlaceholderText="Set Money"; moneyBox.TextColor3=Color3.fromRGB(235,240,255)
+moneyBox.BackgroundColor3=Color3.fromRGB(31,33,44); moneyBox.Font=Enum.Font.Gotham; moneyBox.TextSize=14; moneyBox.ClearTextOnFocus=false; r8(moneyBox); stroke(moneyBox,0.6); padL(moneyBox,8); moneyBox.ZIndex=11
+
+local setMoneyBtn = mkBtn(main, UDim2.fromOffset(rightX, moneyY), UDim2.new(0.5,-15,0,34), "ðŸ’°  Set Money", Color3.fromRGB(56,140,92))
+setMoneyBtn.MouseButton1Click:Connect(function()
+  local v=parseNumber(moneyBox.Text); if not v then return er("Money is invalid") end
+  local okk, res = pcall(function() return RF_GiveMoney:InvokeServer(v) end)
+  if okk then ok("Set money -> "..v) else er(tostring(res)) end
+end)
+
+local rebirthBox = Instance.new("TextBox", main)
+rebirthBox.Size=UDim2.new(0.5,-15,0,34); rebirthBox.Position=UDim2.fromOffset(leftX, rebirthY)
+rebirthBox.Text=""; rebirthBox.PlaceholderText="Set Rebirth"; rebirthBox.TextColor3=Color3.fromRGB(235,240,255)
+rebirthBox.BackgroundColor3=Color3.fromRGB(31,33,44); rebirthBox.Font=Enum.Font.Gotham; rebirthBox.TextSize=14; rebirthBox.ClearTextOnFocus=false; r8(rebirthBox); stroke(rebirthBox,0.6); padL(rebirthBox,8); rebirthBox.ZIndex=11
+
+local setRebirthBtn = mkBtn(main, UDim2.fromOffset(rightX, rebirthY), UDim2.new(0.5,-15,0,34), "ðŸ”„  Set Rebirth", Color3.fromRGB(86,88,150))
+setRebirthBtn.MouseButton1Click:Connect(function()
+  local v=parseNumber(rebirthBox.Text); if not v then return er("Rebirth is invalid") end
+  local okk, res = pcall(function() return RF_GiveRebirth:InvokeServer(v) end)
+  if okk then ok("Set rebirth -> "..v) else er(tostring(res)) end
+end)
+
+---------------- Status helpers cho popup ----------------
+local function mkStatus(parent)
+  local s=mkLabel(parent,"Made By Baiyan",12,40,false,false)
+  s.Font=Enum.Font.Code; s.TextXAlignment=Enum.TextXAlignment.Left; s.TextColor3=Color3.fromRGB(180,200,230); s.ZIndex=21
+  local function ok2(m) s.TextColor3=Color3.fromRGB(160,240,160); s.Text="âœ… "..m end
+  local function er2(m) s.TextColor3=Color3.fromRGB(255,140,140); s.Text="âŒ "..m end
+  return s, ok2, er2
+end
+
+---------------- Brainrot Spawner ----------------
+local function makeSpawner()
+  local win=Instance.new("Frame", gui)
+  win.Name="BaiyanSpawnerWin"; win.Size=UDim2.fromOffset(320,176); win.Position=POS.spawner
+  local drag=Instance.new("Frame", win); drag.Size=UDim2.new(1,0,0,44); drag.BackgroundTransparency=1
+
+
+
+
+
+
+
+  -- dropdown traits
+  local T = AttachTraitsDropdown(win, { y = 138, panelH = 160, z = 22, baseHeight = win.Size.Y.Offset })
+
+  -- spawn 1 láº§n (giá»¯ loop cÅ© gá»i láº¡i once() nhÆ° trÆ°á»›c)
+local function once()
+    local name = (nameBox.Text or ""):match("^%s*(.-)%s*$")
+    if name == "" then return end
+
+    local mutation  = normalizeMutationEmpty(mut.Text)    -- "" = Normal
+    local traitsStr = T.GetString()                       -- "" | "All" | "A, B, C"
+
+    local okk, res = pcall(function()
+        return RF_SpawnBrainrot:InvokeServer(name, mutation, traitsStr)
+    end)
+
+    if okk then
+        ok2(("SpawnBrainrot [%s | %s | %s]"):format(
+            name, mutation ~= "" and mutation or "empty",
+            traitsStr ~= "" and traitsStr or "none"
+        ))
+
+        -- Äáº·c biá»‡t: spawn kÃ¨m StartEvent tÆ°Æ¡ng á»©ng
+        local lname = name:lower()
+        if lname == "strawberry elephant" then
+            pcall(function() RF_StartEvent:InvokeServer("Strawberry") end)
+        elseif lname == "meowl" then
+            pcall(function() RF_StartEvent:InvokeServer("Meowl") end)
+        end
+    else
+        er2(tostring(res))
+    end
+end
+  spawn.MouseButton1Click:Connect(once)
+
+  local looping=false; local th
+  loop.MouseButton1Click:Connect(function()
+    looping=not looping; loop.Text=looping and "Loop: ON" or "Loop: OFF"
+    loop.BackgroundColor3=looping and Color3.fromRGB(68,110,82) or Color3.fromRGB(54,62,86)
+    if looping then
+      if th and coroutine.status(th)~="dead" then return end
+      th=coroutine.create(function() while looping do once(); task.wait(0.1) end end)
+      coroutine.resume(th)
+    end
+  end)
+
+  return win
+end
+
+---------------- Add Brainrot (SpawnBrainrotInBase) ----------------
+local function makeAddWin()
+    local win=Instance.new("Frame", gui)
+    win.Name="BaiyanAddBrainWin"; win.Size=UDim2.fromOffset(320,176); win.Position=POS.add
+    glass(win); r12(win); win.ZIndex=20
+
+    local drag=Instance.new("Frame", win); drag.Size=UDim2.new(1,0,0,44); drag.BackgroundTransparency=1; drag.ZIndex=21
+    addDrag(drag, win, {deadzone=6, hold_ms=0, onRelease=function() savePos("add", win) end})
+
+    mkLabel(win,"Add Brainrot",18,8,true,true).ZIndex=21
+
+    local close=Instance.new("TextButton", win)
+    close.Size=UDim2.fromOffset(28,28); close.Position=UDim2.new(1,-34,0,8); close.Text="âŒ"
+    close.BackgroundColor3=Color3.fromRGB(70,40,50); close.TextColor3=Color3.fromRGB(255,230,236)
+    close.Font=Enum.Font.GothamBold; close.TextSize=16; r8(close); stroke(close,0.35); close.ZIndex=21
+    close.MouseButton1Click:Connect(function() win.Visible=false end)
+
+    local sLabel, ok2, er2 = mkStatus(win)
+
+    -- Name
+    local nameBox=Instance.new("TextBox", win)
+    nameBox.Size=UDim2.new(1,-20,0,32); nameBox.Position=UDim2.fromOffset(10,60)
+    nameBox.Text=''; nameBox.PlaceholderText="Brainrot name (same as Spawner)"
+    nameBox.BackgroundColor3=Color3.fromRGB(31,33,44); nameBox.TextColor3=Color3.fromRGB(230,235,255)
+    nameBox.Font=Enum.Font.Gotham; nameBox.TextSize=14; nameBox.ClearTextOnFocus=false; r8(nameBox); stroke(nameBox,0.6); padL(nameBox,8); nameBox.ZIndex=21
+
+    -- Mutation (giá»‘ng Spawner, KHÃ”NG cÃ³ loop)
+    local mut=Instance.new("TextBox", win)
+    mut.PlaceholderText="Mutation (optional)"; mut.Text=""   -- Ä‘á»ƒ trá»‘ng = Normal server
+    mut.BackgroundColor3=Color3.fromRGB(31,33,44); mut.TextColor3=Color3.fromRGB(230,235,255)
+    mut.Font=Enum.Font.Gotham; mut.TextSize=14; mut.ClearTextOnFocus=false; r8(mut); stroke(mut,0.6); padL(mut,8); mut.ZIndex=21
+
+    local addBtn=Instance.new("TextButton", win)
+    addBtn.Text="ADD"; addBtn.TextColor3=Color3.new(1,1,1); addBtn.Font=Enum.Font.GothamBold; addBtn.TextSize=14
+    addBtn.BackgroundColor3=Color3.fromRGB(112,100,255); r8(addBtn); stroke(addBtn,0.6); addBtn.ZIndex=21
+
+    -- Layout hÃ ng Mutation + ADD (giá»‘ng Spawner)
+    local function place()
+        local L,R,gap,H=10,10,10,30
+        local W=win.AbsoluteSize.X-L-R
+        local mutW=math.max(110, math.floor(W*0.56)) -- rá»™ng hÆ¡n vÃ¬ khÃ´ng cÃ³ loop
+        local addW=W-(mutW+gap)
+        mut.Position=UDim2.fromOffset(L,100);     mut.Size=UDim2.fromOffset(mutW,H)
+        addBtn.Position=UDim2.fromOffset(L+mutW+gap,100); addBtn.Size=UDim2.fromOffset(addW,H)
+    end
+    place(); win:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+
+    -- Traits dropdown Ä‘Ãºng vá»‹ trÃ­ (y = 138), viá»n nÃºt Ä‘á»“ng bá»™
+    local T = AttachTraitsDropdown(win, { y = 138, panelH = 160, z = 22, baseHeight = win.Size.Y.Offset })
+
+    -- Gá»­i SpawnBrainrotInBase(name, mutation, traitsString)
+    local function once()
+        local animal   = (nameBox.Text or ""):match("^%s*(.-)%s*$"); if animal=="" then return end
+        local mutation = normalizeMutationEmpty(mut.Text)
+
+            return RF_SpawnBrainrotInBase:InvokeServer(animal, mutation, traitsStr)
+        end)
+        if okk then
+            ok2(("AddBrainrot [%s | %s | %s]"):format(animal, mutation ~= "" and mutation or "empty", traitsStr ~= "" and traitsStr or "none"))
+        else
+            er2(tostring(res))
+        end
+    end
+    addBtn.MouseButton1Click:Connect(once)
+
+    return win
+end
+
+---------------- Event Executor ----------------
+local EVENT_LIST = {
+"10B Visits","4th of July","Bombardiro Crocodilo","Chicleteira Bicicleteira","Crab Rave",
+"La Vacca Saturno Saturnita","Los Matteos","Nyan Cats","Phase 1: Sleepy","Phase 2: Galaxy Introduction",
+"Phase 3: Sammy's Base","Phase 4: Mygame43","Phase 5: Sammy Snap","Raining Tacos","Rap Concert",
+"Sammyni Spyderini","Solar Flare","Tung Tung Attack","1MEvent","300K","Brazil","Bubblegum","Candy",
+"Concert","DulDulDul","Extinct","FatSammy","Galaxy","Glitch","Matteo","Mexico","Molten","Pinata",
+"Rain","Rainbow","Snow","Starfall","Stock","Strawberry","UFO","Water","YinYang","x4Event","x6Event","x8Event","Witching Hour",
+"Indonesia","Meowl","Trick Or Treat","1x1x1x1"
+}
+-- CÃ¡c event cáº§n bá» qua khi Execute All
+local SKIP_EVENTS = {
+  ["Phase 1: Sleepy"] = true,
+  ["Phase 2: Galaxy Introduction"] = true,
+  ["Phase 3: Sammy's Base"] = true,
+  ["Phase 4: Mygame43"] = true,
+  ["Phase 5: Sammy Snap"] = true,
+}
+local function makeEventWin()
+  local win=Instance.new("Frame", gui)
+  win.Name="BaiyanEventWin"; win.Size=UDim2.fromOffset(320, 240); win.Position=POS.event
+  glass(win); r12(win); win.ZIndex=20; win.ClipsDescendants=false
+  local drag=Instance.new("Frame", win); drag.Size=UDim2.new(1,0,0,44); drag.BackgroundTransparency=1
+  addDrag(drag, win, {deadzone=6, hold_ms=0, onRelease=function() savePos("event", win) end}); drag.ZIndex=21
+  mkLabel(win,"Event Executor",18,8,true,true).ZIndex=21
+  local close=Instance.new("TextButton", win)
+  close.Size=UDim2.fromOffset(28,28); close.Position=UDim2.new(1,-34,0,8); close.Text="âŒ"
+  close.BackgroundColor3=Color3.fromRGB(70,40,50); close.TextColor3=Color3.fromRGB(255,230,236); close.Font=Enum.Font.GothamBold; close.TextSize=16; r8(close); stroke(close,0.35); close.ZIndex=21
+  close.MouseButton1Click:Connect(function() win.Visible=false end)
+
+  local sStatus, ok2, er2 = mkStatus(win)
+
+  local selected=nil
+  local dropBtn=Instance.new("TextButton", win)
+  dropBtn.Size=UDim2.new(1,-60,0,34); dropBtn.Position=UDim2.fromOffset(10,60)
+  dropBtn.Text="Select event"; dropBtn.TextXAlignment=Enum.TextXAlignment.Left
+  dropBtn.BackgroundColor3=Color3.fromRGB(31,33,44); dropBtn.TextColor3=Color3.fromRGB(230,235,255)
+  dropBtn.Font=Enum.Font.Gotham; dropBtn.TextSize=14; r8(dropBtn); stroke(dropBtn,0.6); padL(dropBtn,8); dropBtn.ZIndex=21
+
+  local caret=Instance.new("TextButton", win)
+  caret.Size=UDim2.fromOffset(34,34); caret.Position=UDim2.fromOffset(win.Size.X.Offset-44, 60)
+  caret.Text="â–¾"; caret.BackgroundColor3=Color3.fromRGB(54,62,86); caret.TextColor3=Color3.fromRGB(235,240,255)
+  caret.Font=Enum.Font.GothamSemibold; caret.TextSize=14; r8(caret); stroke(caret,0.6); caret.ZIndex=21
+
+  local execBtn=Instance.new("TextButton", win)
+  execBtn.Size=UDim2.new(1,-20,0,38); execBtn.Position=UDim2.fromOffset(10, 190)
+  execBtn.Text="EXECUTE"; execBtn.TextColor3=Color3.new(1,1,1)
+  execBtn.Font=Enum.Font.GothamBold; execBtn.TextSize=15
+  execBtn.BackgroundColor3=Color3.fromRGB(112,100,255); r12(execBtn); stroke(execBtn,0.6); execBtn.ZIndex=22
+
+  local panel=Instance.new("Frame", win)
+  panel.Name="EventDropdownPanel"; panel.Visible=false; panel.ZIndex=20
+  panel.BackgroundColor3=Color3.fromRGB(26,28,38); r8(panel); stroke(panel,0.6); panel.ClipsDescendants=true
+  local scroll=Instance.new("ScrollingFrame", panel)
+  scroll.BackgroundTransparency=1; scroll.Size=UDim2.new(1,0,1,0); scroll.CanvasSize=UDim2.new(0,0,0,0); scroll.ScrollBarThickness=5; scroll.ZIndex=21
+  local list=Instance.new("UIListLayout", scroll); list.Padding=UDim.new(0,6)
+
+  local function refreshCanvas() task.wait(); scroll.CanvasSize=UDim2.new(0,0,0,list.AbsoluteContentSize.Y+6) end
+  for _,v in ipairs(EVENT_LIST) do
+    local it=Instance.new("TextButton", scroll)
+    it.ZIndex=21; it.Size=UDim2.new(1,-8,0,26); it.Position=UDim2.fromOffset(4,0)
+    it.Text=v; it.TextSize=12; it.Font=Enum.Font.Gotham; it.TextColor3=Color3.fromRGB(235,240,255)
+    it.BackgroundColor3=Color3.fromRGB(38,44,58); r8(it)
+    it.MouseButton1Click:Connect(function() panel.Visible=false; dropBtn.Text=v; selected=v end)
+  end
+  list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshCanvas); refreshCanvas()
+
+  local function placePanel()
+    local gap = 6
+    local topY    = dropBtn.Position.Y.Offset + dropBtn.AbsoluteSize.Y + gap
+    local bottomY = execBtn.Position.Y.Offset - gap
+    local availH  = math.max(70, bottomY - topY)
+    panel.Position = UDim2.fromOffset(10, topY)
+    panel.Size     = UDim2.new(1,-20,0,availH)
+  win:GetPropertyChangedSignal("AbsoluteSize"):Connect(placePanel)
+  dropBtn:GetPropertyChangedSignal("AbsolutePosition"):Connect(placePanel)
+
+  local function togglePanel() placePanel(); panel.Visible = not panel.Visible end
+  dropBtn.MouseButton1Click:Connect(togglePanel)
+  caret.MouseButton1Click:Connect(togglePanel)
+-- EXECUTE: cháº¡y 1 event Ä‘Ãºng máº«u: StartEvent("<name>")
+execBtn.MouseButton1Click:Connect(function()
+    local ev = selected or dropBtn.Text
+    ev = tostring(ev or ""):match("^%s*(.-)%s*$")
+    if ev == "" or ev == "Select event" then return er2("Pick an event") end
+
+    local okk, res = pcall(function()
+        return RF_StartEvent:InvokeServer(ev)  -- { "<EventName>" }
+    end)
+    if okk then
+        ok2("StartEvent: "..ev)
+    else
+        er2(tostring(res))
+    end
+end)
+  
+-- Execute All Events: cháº¡y toÃ n bá»™ EVENT_LIST song song, nhÆ°ng bá» 5 Phase cá»¥ thá»ƒ
+execAll.MouseButton1Click:Connect(function()
+    local queued = 0
+    for _, ev in ipairs(EVENT_LIST) do
+        if not SKIP_EVENTS[ev] then
+            queued += 1
+            task.spawn(function()
+                pcall(function()
+                    RF_StartEvent:InvokeServer(ev)   -- { "<EventName>" }
+                end)
+            end)
+        end
+    end
+    ok(("Queued %d events (skipped Phase 1..5)"):format(queued))
+end)
+
+  return win
+end
+
+---------------- Lucky Block Spawner (cÃ³ Traits giá»‘ng Brainrot) ----------------
+-- Lucky Block Spawner (dÃ¹ng cÃ¹ng remote/format vá»›i Brainrot Spawner)
+local function makeLuckyWin()
+  local win=Instance.new("Frame", gui)
+  win.Name="BaiyanLuckyWin"; win.Size=UDim2.fromOffset(320,176); win.Position=POS.lucky
+  glass(win); r12(win); win.ZIndex=20
+  local drag=Instance.new("Frame", win); drag.Size=UDim2.new(1,0,0,44); drag.BackgroundTransparency=1
+  addDrag(drag, win, {deadzone=6, hold_ms=0, onRelease=function() savePos("lucky", win) end}); drag.ZIndex=21
+  mkLabel(win,"Lucky Block Spawner",18,8,true,true).ZIndex=21
+  local close=Instance.new("TextButton", win)
+  close.Size=UDim2.fromOffset(28,28); close.Position=UDim2.new(1,-34,0,8); close.Text="âŒ"
+  close.BackgroundColor3=Color3.fromRGB(70,40,50); close.TextColor3=Color3.fromRGB(255,230,236); close.Font=Enum.Font.GothamBold; close.TextSize=16; r8(close); stroke(close,0.35); close.ZIndex=21
+  close.MouseButton1Click:Connect(function() win.Visible=false end)
+
+  local sStatus, ok2, er2 = mkStatus(win)
+
+  nameBox.Size=UDim2.new(1,-20,0,32); nameBox.Position=UDim2.fromOffset(10,60)
+  nameBox.Text=""; nameBox.PlaceholderText="Lucky Block name"
+  nameBox.BackgroundColor3=Color3.fromRGB(31,33,44); nameBox.TextColor3=Color3.fromRGB(230,235,255)
+  nameBox.Font=Enum.Font.Gotham; nameBox.TextSize=14; nameBox.ClearTextOnFocus=false; r8(nameBox); stroke(nameBox,0.6); padL(nameBox,8); nameBox.ZIndex=21
+
+  -- Mutation (optional) â€” Ä‘á»ƒ trá»‘ng = Normal
+  local mut=Instance.new("TextBox", win)
+  mut.PlaceholderText="Mutation (optional)"; mut.Text=""
+  mut.BackgroundColor3=Color3.fromRGB(31,33,44); mut.TextColor3=Color3.fromRGB(230,235,255)
+  mut.Font=Enum.Font.Gotham; mut.TextSize=14; mut.ClearTextOnFocus=false; r8(mut); stroke(mut,0.6); padL(mut,8); mut.ZIndex=21
+
+  -- Loop
+  local loop=Instance.new("TextButton", win)
+  loop.Text="Loop: OFF"; loop.TextColor3=Color3.fromRGB(230,235,255); loop.Font=Enum.Font.GothamSemibold; loop.TextSize=12
+  loop.BackgroundColor3=Color3.fromRGB(54,62,86); r8(loop); stroke(loop,0.6); loop.ZIndex=21
+
+  -- Spawn
+  local spawn=Instance.new("TextButton", win)
+  spawn.Text="SPAWN"; spawn.TextColor3=Color3.new(1,1,1); spawn.Font=Enum.Font.GothamBold; spawn.TextSize=14
+  spawn.BackgroundColor3=Color3.fromRGB(112,100,255); r8(spawn); stroke(spawn,0.6); spawn.ZIndex=21
+
+  -- layout
+  local function place()
+    local L,R,gap,H=10,10,10,30
+    local W=win.AbsoluteSize.X-L-R
+    local loopW=86
+    local mutW=math.max(110, math.floor(W*0.34))
+    local spawnW=W-(mutW+loopW+2*gap)
+    mut.Position=UDim2.fromOffset(L,100); mut.Size=UDim2.fromOffset(mutW,H)
+    loop.Position=UDim2.fromOffset(L+mutW+gap,100); loop.Size=UDim2.fromOffset(loopW,H)
+    spawn.Position=UDim2.fromOffset(L+mutW+gap+loopW+gap,100); spawn.Size=UDim2.fromOffset(spawnW,H)
+  end
+  place(); win:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+
+  -- Traits (giá»‘ng Brainrot Spawner, cÃ³ "All")
+  local T = AttachTraitsDropdown(win, { y = 138, panelH = 160, z = 22, baseHeight = win.Size.Y.Offset })
+
+  -- call chung: RF_SpawnBrainrot(name, mutation, traitsString)
+  local function once()
+    local lb = (nameBox.Text or ""):match("^%s*(.-)%s*$"); if lb == "" then return er2("Enter a lucky block name") end
+    local mutation  = normalizeMutationEmpty(mut.Text)
+    local traitsStr = T.GetString() -- "", "All" or "A, B, C"
+
+    local okk, res = pcall(function()
+      return RF_SpawnBrainrot:InvokeServer(lb, mutation, traitsStr)
+      ok2(("SpawnLucky [%s | %s | %s]"):format(lb, mutation~="" and mutation or "empty", traitsStr~="" and traitsStr or "none"))
+    else
+      er2(tostring(res))
+    end
+  end
+  spawn.MouseButton1Click:Connect(once)
+
+  local looping=false; local th
+  loop.MouseButton1Click:Connect(function()
+    looping=not looping; loop.Text=looping and "Loop: ON" or "Loop: OFF"
+    loop.BackgroundColor3=looping and Color3.fromRGB(68,110,82) or Color3.fromRGB(54,62,86)
+    if looping then
+      if th and coroutine.status(th)~="dead" then return end
+      th=coroutine.create(function() while looping do once(); task.wait(1.0) end end)
+      coroutine.resume(th)
+    end
+  end)
+
+  return win
+end
+
+---------------- Brainrot Morph (RF/AdminService/Morph) ----------------
+-- náº¿u chÆ°a cÃ³ helper nÃ y á»Ÿ trÃªn file thÃ¬ giá»¯ láº¡i; náº¿u Ä‘Ã£ cÃ³ rá»“i thÃ¬ bá» Ä‘oáº¡n if nÃ y
+if not normalizeMutationEmpty then
+    local function _norm(s)
+        s = tostring(s or ""):match("^%s*(.-)%s*$")
+        if s == "" or s:lower() == "normal" then return "" end
+        return s
+    end
+    normalizeMutationEmpty = _norm
+end
+
+-- === Brainrot Morph (UI giá»‘ng Add Brainrot) ===
+local function makeMorphWin()
+    local win = Instance.new("Frame", gui)
+    win.Name = "BaiyanMorphWin"
+    win.Size = UDim2.fromOffset(320, 196)
+    win.Position = POS.morph
+    glass(win); r12(win); win.ZIndex = 20
+
+    -- drag trÃªn header
+    local drag = Instance.new("Frame", win)
+    drag.Size = UDim2.new(1, 0, 0, 44)
+    drag.BackgroundTransparency = 1
+    drag.ZIndex = 21
+    addDrag(drag, win, { deadzone = 6, hold_ms = 0, onRelease = function() savePos("morph", win) end })
+
+    mkLabel(win, "Brainrot Morph", 18, 8, true, true).ZIndex = 21
+
+    local close = Instance.new("TextButton", win)
+    close.Size = UDim2.fromOffset(28, 28)
+    close.Position = UDim2.new(1, -34, 0, 8)
+    close.Text = "âŒ"
+    close.BackgroundColor3 = Color3.fromRGB(70, 40, 50)
+    close.TextColor3 = Color3.fromRGB(255, 230, 236)
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 16
+    r8(close); stroke(close, 0.35); close.ZIndex = 21
+    close.MouseButton1Click:Connect(function() win.Visible = false end)
+
+    local _, ok2, er2 = mkStatus(win)
+
+    -- Name
+    local nameBox = Instance.new("TextBox", win)
+
+
+
+
+
+        local name = (nameBox.Text or ""):match("^%s*(.-)%s*$"); if name == "" then return end
+        local mutation  = normalizeMutationEmpty(mut.Text)
+        local traitsStr = T.GetString()  -- "" | "All" | "A, B, C"
+
+        local okk, res = pcall(function()
+            return RF_Morph:InvokeServer(name, mutation, traitsStr, "Yes", "Yes")
+        end)
+        if okk then
+            ok2(("Morph [%s | %s | %s]"):format(name, mutation ~= "" and mutation or "empty", traitsStr ~= "" and traitsStr or "none"))
+        else
+            er2(tostring(res))
+        end
+    end)
+
+    return win
+end
+
+---------------- Create / Toggle logic ----------------
+local spawnerWin, eventWin, luckyWin, addWin, morphWin
+
+local function newOrToggle(ref, maker, key)
+  if not ref or not ref.Parent then
+    ref = maker()
+    ref.Visible = true
+    ensureVisible(ref, key)
+    return ref
+  end
+  ref.Visible = not ref.Visible
+  if ref.Visible then ensureVisible(ref, key) end
+  return ref
+end
+
+openSpawner.MouseButton1Click:Connect(function() spawnerWin = newOrToggle(spawnerWin, makeSpawner, "spawner") end)
+openAdd.MouseButton1Click:Connect(function()     addWin     = newOrToggle(addWin,     makeAddWin,  "add")     end)
+openEvent.MouseButton1Click:Connect(function()   eventWin   = newOrToggle(eventWin,   makeEventWin,"event")   end)
+openLucky.MouseButton1Click:Connect(function()   luckyWin   = newOrToggle(luckyWin,   makeLuckyWin,"lucky")   end)
+openMorph.MouseButton1Click:Connect(function()   morphWin   = newOrToggle(morphWin,   makeMorphWin,"morph")   end)
+
+-- Execute All Events: cháº¡y toÃ n bá»™ EVENT_LIST (song song, khÃ´ng wait)
+execAll.MouseButton1Click:Connect(function()
+    local cnt = 0
+    for _, ev in ipairs(EVENT_LIST) do
+        cnt += 1
+        task.spawn(function()
+            pcall(function()
+                RF_StartEvent:InvokeServer(ev)   -- { "<EventName>" }
+            end)
+        end)
+    end
+    ok(("Queued %d events (no wait)"):format(cnt))
+end)
+
+-- Stop Event (náº¿u cÃ³ RF_StopEvent)
+stopEventBtn.MouseButton1Click:Connect(function()
+  if not RF_StopEvent then return er("StopEvent remote not found") end
+  ok("Stopping events one by one...")
+  task.spawn(function()
+    for _,ev in ipairs(EVENT_LIST) do
+      if okk then status.Text = ("âœ… stopped: %s"):format(ev) else status.Text=("âŒ stop failed: %s"):format(ev) end
+      task.wait(0.12)
+    end
+    ok("Done stopping all known events")
+  end)
+end)
+
+-- Verified (PlayerMorph RE)
+verifiedBtn.MouseButton1Click:Connect(function()
+  local okk,res = pcall(function() return RE_PlayerMorph:FireServer("", "", "Yes") end)
+  if okk then ok("Verified morph sent") else er(tostring(res)) end
+end)
+
+-- Toggle chá»‰ áº©n/hiá»‡n panel chÃ­nh
+toggle.MouseButton1Click:Connect(function()
+  main.Visible = not main.Visible
+end)
