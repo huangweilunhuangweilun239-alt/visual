@@ -1,4 +1,4 @@
-shared.LoaderTitle = "Mod By Baiyan";
+shared.LoaderTitle = "BaiyanScript";
 shared.LoaderKeyFrames = {
     [1] = {
         1,
