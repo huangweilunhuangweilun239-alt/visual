@@ -1,0 +1,23 @@
+local whitelist = {
+    "your user name"
+}
+
+local function isWhitelisted(name)
+	for _, v in ipairs(whitelist) do
+		if string.lower(v) == string.lower(name) then
+			return true
+		end
+	end
+	return false
+end
+
+local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+if not isWhitelisted(player.Name) then
+	player:Kick("You have been kicked by this experience or its moderators.")
+	return
+end
