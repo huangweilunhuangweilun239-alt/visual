@@ -1,0 +1,19 @@
+local whitelist = {
+    [your user id] = true
+}
+
+local function isWhitelisted(plr)
+    return whitelist[plr.UserId] == true
+end
+
+local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+if not isWhitelisted(player) then
+    player:Kick("You have been kicked by this experience or its moderators.")
+    return
+end
