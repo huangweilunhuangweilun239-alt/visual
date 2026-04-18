@@ -1,0 +1,760 @@
+-- =====================================================
+-- BRAINROT STEALER |
+-- Username lookup works for ANY Roblox player
+-- Mobile & PC dragging support
+-- Modern UI with redesigned toggle switches
+-- Rainbow watermark goes left to right
+-- Breathing dark purple border
+-- Toggle ripple flash effect
+-- Fixed floating circle and GUI open/close
+-- =====================================================
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+
+-- SCREEN GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BrainrotStealerGUI"
+ScreenGui.IgnoreGuiInset = false
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game.CoreGui or player:WaitForChild("PlayerGui")
+
+-- FLOATING TOGGLE CIRCLE (created first so buttons can reference it)
+local CircleToggle = Instance.new("TextButton")
+CircleToggle.Size = UDim2.new(0, 50, 0, 50)
+CircleToggle.Position = UDim2.new(0, 20, 0.5, -25)
+CircleToggle.AnchorPoint = Vector2.new(0, 0)
+CircleToggle.BackgroundColor3 = Color3.fromRGB(35, 30, 55)
+CircleToggle.BorderSizePixel = 0
+CircleToggle.Text = ""
+CircleToggle.ZIndex = 100
+CircleToggle.Parent = ScreenGui
+
+local CircleCorner = Instance.new("UICorner")
+CircleCorner.CornerRadius = UDim.new(1, 0)
+CircleCorner.Parent = CircleToggle
+
+local CircleStroke = Instance.new("UIStroke")
+CircleStroke.Thickness = 1.5
+CircleStroke.Color = Color3.fromRGB(90, 70, 160)
+CircleStroke.Transparency = 0.3
+CircleStroke.Parent = CircleToggle
+
+local circleHue = 0
+RunService.Heartbeat:Connect(function(dt)
+    circleHue = (circleHue + dt * 0.5) % 1
+    CircleStroke.Color = Color3.fromHSV(circleHue, 0.5, 0.7)
+end)
+
+-- MAIN FRAME
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 280, 0, 310)
+MainFrame.Position = UDim2.new(0.5, -140, 0.6, -155)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+MainFrame.BorderSizePixel = 0
+MainFrame.ZIndex = 1
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 14)
+MainCorner.Parent = MainFrame
+
+-- BREATHING DARK PURPLE BORDER
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Thickness = 2
+MainStroke.Transparency = 0
+MainStroke.Parent = MainFrame
+
+local BorderGradient = Instance.new("UIGradient")
+BorderGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 40, 180)),
+    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(90, 30, 150)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 50, 200)),
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(100, 35, 160)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 40, 180))
+}
+BorderGradient.Rotation = 0
+BorderGradient.Parent = MainStroke
+
+local borderBreath = 0
+local borderBreathDir = 1
+RunService.Heartbeat:Connect(function(dt)
+    BorderGradient.Rotation = (BorderGradient.Rotation + dt * 40) % 360
+    borderBreath = borderBreath + dt * borderBreathDir * 0.7
+    if borderBreath >= 1 then
+        borderBreath = 1
+        borderBreathDir = -1
+    elseif borderBreath <= 0 then
+        borderBreath = 0
+        borderBreathDir = 1
+    end
+    MainStroke.Transparency = borderBreath * 0.45
+end)
+
+-- TITLE BAR
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 42)
+TitleBar.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Active = true
+TitleBar.ZIndex = 2
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 14)
+TitleCorner.Parent = TitleBar
+
+local TitleCover = Instance.new("Frame")
+TitleCover.Size = UDim2.new(1, 0, 0, 14)
+TitleCover.Position = UDim2.new(0, 0, 1, -14)
+TitleCover.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+TitleCover.BorderSizePixel = 0
+TitleCover.ZIndex = 2
+TitleCover.Parent = TitleBar
+
+-- Accent line under title (cyan/blue)
+local AccentLine = Instance.new("Frame")
+AccentLine.Size = UDim2.new(1, -24, 0, 2)
+AccentLine.Position = UDim2.new(0, 12, 1, -1)
+AccentLine.BorderSizePixel = 0
+AccentLine.ZIndex = 3
+AccentLine.Parent = TitleBar
+
+local AccentGradient = Instance.new("UIGradient")
+AccentGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 140, 220)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 200, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 140, 220))
+}
+AccentGradient.Parent = AccentLine
+
+local AccentCorner = Instance.new("UICorner")
+AccentCorner.CornerRadius = UDim.new(0, 1)
+AccentCorner.Parent = AccentLine
+
+spawn(function()
+    local offset = 0
+    RunService.Heartbeat:Connect(function(dt)
+        offset = (offset + dt * 0.3) % 1
+        AccentGradient.Offset = Vector2.new(offset, 0)
+    end)
+end)
+
+local Title = Instance.new("TextLabel")
+Title.Text = "BRAINROT STEALER"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+Title.TextColor3 = Color3.fromRGB(230, 230, 245)
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, -50, 1, 0)
+Title.Position = UDim2.new(0, 14, 0, 0)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 3
+Title.Parent = TitleBar
+
+-- MINIMIZE BUTTON
+local MinButton = Instance.new("TextButton")
+MinButton.Size = UDim2.new(0, 28, 0, 28)
+MinButton.Position = UDim2.new(1, -68, 0.5, -14)
+MinButton.Text = "–"
+MinButton.Font = Enum.Font.GothamBold
+MinButton.TextSize = 16
+MinButton.TextColor3 = Color3.fromRGB(180, 180, 200)
+MinButton.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+MinButton.BorderSizePixel = 0
+MinButton.ZIndex = 5
+MinButton.Parent = TitleBar
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 8)
+MinCorner.Parent = MinButton
+
+local guiVisible = true
+
+MinButton.MouseEnter:Connect(function()
+    TweenService:Create(MinButton, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 50, 68)}):Play()
+end)
+MinButton.MouseLeave:Connect(function()
+    TweenService:Create(MinButton, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(35, 35, 48)}):Play()
+end)
+
+-- CLOSE BUTTON
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 28, 0, 28)
+CloseButton.Position = UDim2.new(1, -34, 0.5, -14)
+CloseButton.Text = "×"
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 16
+CloseButton.TextColor3 = Color3.fromRGB(180, 180, 200)
+CloseButton.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+CloseButton.BorderSizePixel = 0
+CloseButton.ZIndex = 5
+CloseButton.Parent = TitleBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseEnter:Connect(function()
+    TweenService:Create(CloseButton, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(180, 60, 60)}):Play()
+end)
+CloseButton.MouseLeave:Connect(function()
+    TweenService:Create(CloseButton, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(35, 35, 48)}):Play()
+end)
+
+-- CLOSE / MINIMIZE (same pattern as original)
+CloseButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    guiVisible = false
+    CircleToggle.BackgroundColor3 = Color3.fromRGB(55, 45, 80)
+end)
+
+MinButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    guiVisible = false
+    CircleToggle.BackgroundColor3 = Color3.fromRGB(55, 45, 80)
+end)
+
+-- USERNAME INPUT SECTION
+local UsernameSection = Instance.new("Frame")
+UsernameSection.Size = UDim2.new(1, -24, 0, 72)
+UsernameSection.Position = UDim2.new(0, 12, 0, 52)
+UsernameSection.BackgroundColor3 = Color3.fromRGB(25, 25, 34)
+UsernameSection.BorderSizePixel = 0
+UsernameSection.ZIndex = 2
+UsernameSection.Parent = MainFrame
+
+local UsernameCorner = Instance.new("UICorner")
+UsernameCorner.CornerRadius = UDim.new(0, 10)
+UsernameCorner.Parent = UsernameSection
+
+local UserStroke = Instance.new("UIStroke")
+UserStroke.Thickness = 1
+UserStroke.Color = Color3.fromRGB(45, 45, 60)
+UserStroke.Transparency = 0.4
+UserStroke.Parent = UsernameSection
+
+local UsernameLabel = Instance.new("TextLabel")
+UsernameLabel.Text = "TARGET"
+UsernameLabel.Font = Enum.Font.GothamBold
+UsernameLabel.TextSize = 10
+UsernameLabel.TextColor3 = Color3.fromRGB(120, 110, 180)
+UsernameLabel.BackgroundTransparency = 1
+UsernameLabel.Size = UDim2.new(1, -12, 0, 16)
+UsernameLabel.Position = UDim2.new(0, 10, 0, 6)
+UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
+UsernameLabel.ZIndex = 3
+UsernameLabel.Parent = UsernameSection
+
+local UsernameBox = Instance.new("TextBox")
+UsernameBox.Size = UDim2.new(1, -82, 0, 32)
+UsernameBox.Position = UDim2.new(0, 10, 0, 28)
+UsernameBox.BackgroundColor3 = Color3.fromRGB(32, 32, 44)
+UsernameBox.BorderSizePixel = 0
+UsernameBox.Text = ""
+UsernameBox.PlaceholderText = "Enter username..."
+UsernameBox.Font = Enum.Font.Gotham
+UsernameBox.TextSize = 13
+UsernameBox.TextColor3 = Color3.fromRGB(220, 220, 240)
+UsernameBox.PlaceholderColor3 = Color3.fromRGB(90, 90, 110)
+UsernameBox.TextXAlignment = Enum.TextXAlignment.Left
+UsernameBox.ClearTextOnFocus = false
+UsernameBox.ZIndex = 3
+UsernameBox.Parent = UsernameSection
+
+local BoxCorner = Instance.new("UICorner")
+BoxCorner.CornerRadius = UDim.new(0, 8)
+BoxCorner.Parent = UsernameBox
+
+local BoxStroke = Instance.new("UIStroke")
+BoxStroke.Thickness = 1
+BoxStroke.Color = Color3.fromRGB(50, 50, 70)
+BoxStroke.Transparency = 0.5
+BoxStroke.Parent = UsernameBox
+
+local BoxPadding = Instance.new("UIPadding")
+BoxPadding.PaddingLeft = UDim.new(0, 10)
+BoxPadding.PaddingRight = UDim.new(0, 10)
+BoxPadding.Parent = UsernameBox
+
+-- Profile Picture
+local ProfilePic = Instance.new("ImageLabel")
+ProfilePic.Size = UDim2.new(0, 52, 0, 52)
+ProfilePic.Position = UDim2.new(1, -60, 0, 10)
+ProfilePic.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+ProfilePic.BorderSizePixel = 0
+ProfilePic.Image = ""
+ProfilePic.ZIndex = 3
+ProfilePic.Parent = UsernameSection
+
+local PicCorner = Instance.new("UICorner")
+PicCorner.CornerRadius = UDim.new(0, 12)
+PicCorner.Parent = ProfilePic
+
+local PicStroke = Instance.new("UIStroke")
+PicStroke.Thickness = 1.5
+PicStroke.Color = Color3.fromRGB(80, 65, 160)
+PicStroke.Transparency = 0.4
+PicStroke.Parent = ProfilePic
+
+local StatusIndicator = Instance.new("TextLabel")
+StatusIndicator.Size = UDim2.new(1, 0, 1, 0)
+StatusIndicator.BackgroundTransparency = 1
+StatusIndicator.Text = "?"
+StatusIndicator.Font = Enum.Font.GothamBold
+StatusIndicator.TextSize = 20
+StatusIndicator.TextColor3 = Color3.fromRGB(100, 90, 150)
+StatusIndicator.ZIndex = 4
+StatusIndicator.Parent = ProfilePic
+
+-- =====================================================
+-- TOGGLE SWITCHES WITH RIPPLE FLASH
+-- =====================================================
+
+local stealEnabled = false
+local acceptEnabled = false
+local targetUserId = nil
+local targetUsername = ""
+
+local function createToggle(text, yPos)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -24, 0, 48)
+    frame.Position = UDim2.new(0, 12, 0, yPos)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 34)
+    frame.BorderSizePixel = 0
+    frame.ZIndex = 3
+    frame.ClipsDescendants = true
+    frame.Parent = MainFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+
+    local fStroke = Instance.new("UIStroke")
+    fStroke.Thickness = 1
+    fStroke.Color = Color3.fromRGB(45, 45, 60)
+    fStroke.Transparency = 0.4
+    fStroke.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Text = text
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextColor3 = Color3.fromRGB(200, 200, 220)
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1, -90, 1, 0)
+    label.Position = UDim2.new(0, 14, 0, 0)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 4
+    label.Parent = frame
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Text = "OFF"
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextSize = 9
+    statusLabel.TextColor3 = Color3.fromRGB(100, 100, 120)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Size = UDim2.new(0, 24, 0, 14)
+    statusLabel.Position = UDim2.new(1, -82, 0.5, -7)
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Right
+    statusLabel.ZIndex = 4
+    statusLabel.Parent = frame
+
+    -- Ripple flash overlay
+    local ripple = Instance.new("Frame")
+    ripple.Size = UDim2.new(0, 0, 1, 0)
+    ripple.Position = UDim2.new(1, 0, 0, 0)
+    ripple.AnchorPoint = Vector2.new(1, 0)
+    ripple.BackgroundColor3 = Color3.fromRGB(80, 220, 130)
+    ripple.BackgroundTransparency = 1
+    ripple.BorderSizePixel = 0
+    ripple.ZIndex = 10
+    ripple.Parent = frame
+
+    local rippleCorner = Instance.new("UICorner")
+    rippleCorner.CornerRadius = UDim.new(0, 10)
+    rippleCorner.Parent = ripple
+
+    local rippleGrad = Instance.new("UIGradient")
+    rippleGrad.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 0.9),
+        NumberSequenceKeypoint.new(0.3, 0.5),
+        NumberSequenceKeypoint.new(0.7, 0.7),
+        NumberSequenceKeypoint.new(1, 1)
+    }
+    rippleGrad.Parent = ripple
+
+    local track = Instance.new("TextButton")
+    track.Size = UDim2.new(0, 42, 0, 22)
+    track.Position = UDim2.new(1, -52, 0.5, -11)
+    track.BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+    track.BorderSizePixel = 0
+    track.Text = ""
+    track.ZIndex = 4
+    track.Parent = frame
+
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = track
+
+    local trackStroke = Instance.new("UIStroke")
+    trackStroke.Thickness = 1.5
+    trackStroke.Color = Color3.fromRGB(55, 50, 80)
+    trackStroke.Transparency = 0.3
+    trackStroke.Parent = track
+
+    local fillBar = Instance.new("Frame")
+    fillBar.Size = UDim2.new(0, 0, 1, -4)
+    fillBar.Position = UDim2.new(0, 2, 0, 2)
+    fillBar.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+    fillBar.BackgroundTransparency = 0.6
+    fillBar.BorderSizePixel = 0
+    fillBar.ZIndex = 5
+    fillBar.Parent = track
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fillBar
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(0, 3, 0.5, -8)
+    knob.BackgroundColor3 = Color3.fromRGB(160, 150, 210)
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 7
+    knob.Parent = track
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(0, 5)
+    knobCorner.Parent = knob
+
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 6, 0, 6)
+    dot.Position = UDim2.new(0.5, -3, 0.5, -3)
+    dot.BackgroundColor3 = Color3.fromRGB(80, 70, 120)
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 8
+    dot.Parent = knob
+
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = dot
+
+    return track, knob, fillBar, dot, statusLabel, trackStroke, ripple
+end
+
+local StealTrack, StealKnob, StealFill, StealDot, StealStatus, StealTrackStroke, StealRipple = createToggle("Steal victims brainrot", 134)
+local AcceptTrack, AcceptKnob, AcceptFill, AcceptDot, AcceptStatus, AcceptTrackStroke, AcceptRipple = createToggle("Auto accept trade", 190)
+
+local switchTween = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+local function fireRipple(ripple, color)
+    ripple.BackgroundColor3 = color
+    ripple.Size = UDim2.new(0, 0, 1, 0)
+    ripple.Position = UDim2.new(1, 0, 0, 0)
+    ripple.BackgroundTransparency = 0.5
+
+    local expandTween = TweenService:Create(ripple, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Size = UDim2.new(1, 0, 1, 0)
+    })
+    expandTween:Play()
+
+    expandTween.Completed:Connect(function()
+        local fadeTween = TweenService:Create(ripple, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 1
+        })
+        fadeTween:Play()
+        fadeTween.Completed:Connect(function()
+            ripple.Size = UDim2.new(0, 0, 1, 0)
+        end)
+    end)
+end
+
+local function toggleSwitch(knob, fillBar, dot, statusLabel, trackStroke, track, ripple, state)
+    if state then
+        TweenService:Create(knob, switchTween, {
+            Position = UDim2.new(1, -19, 0.5, -8),
+            Size = UDim2.new(0, 18, 0, 18),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+        TweenService:Create(fillBar, switchTween, {
+            Size = UDim2.new(1, -4, 1, -4),
+            BackgroundTransparency = 0.3,
+            BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        }):Play()
+        TweenService:Create(dot, switchTween, {
+            BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+        }):Play()
+        TweenService:Create(trackStroke, switchTween, {
+            Color = Color3.fromRGB(70, 190, 110),
+            Transparency = 0.2
+        }):Play()
+        TweenService:Create(track, switchTween, {
+            BackgroundColor3 = Color3.fromRGB(30, 55, 40)
+        }):Play()
+        statusLabel.Text = "ON"
+        TweenService:Create(statusLabel, switchTween, {
+            TextColor3 = Color3.fromRGB(80, 200, 120)
+        }):Play()
+        fireRipple(ripple, Color3.fromRGB(80, 220, 130))
+    else
+        TweenService:Create(knob, switchTween, {
+            Position = UDim2.new(0, 3, 0.5, -8),
+            Size = UDim2.new(0, 16, 0, 16),
+            BackgroundColor3 = Color3.fromRGB(160, 150, 210)
+        }):Play()
+        TweenService:Create(fillBar, switchTween, {
+            Size = UDim2.new(0, 0, 1, -4),
+            BackgroundTransparency = 0.6,
+            BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        }):Play()
+        TweenService:Create(dot, switchTween, {
+            BackgroundColor3 = Color3.fromRGB(80, 70, 120)
+        }):Play()
+        TweenService:Create(trackStroke, switchTween, {
+            Color = Color3.fromRGB(55, 50, 80),
+            Transparency = 0.3
+        }):Play()
+        TweenService:Create(track, switchTween, {
+            BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+        }):Play()
+        statusLabel.Text = "OFF"
+        TweenService:Create(statusLabel, switchTween, {
+            TextColor3 = Color3.fromRGB(100, 100, 120)
+        }):Play()
+    end
+end
+
+StealTrack.MouseButton1Click:Connect(function()
+    if targetUserId == nil then
+        StarterGui:SetCore("SendNotification", {
+            Title = "USERNAME NOT DETECTED";
+            Text = "Enter a valid Roblox username first!";
+            Duration = 4;
+        })
+        return
+    end
+    stealEnabled = not stealEnabled
+    toggleSwitch(StealKnob, StealFill, StealDot, StealStatus, StealTrackStroke, StealTrack, StealRipple, stealEnabled)
+end)
+
+AcceptTrack.MouseButton1Click:Connect(function()
+    if targetUserId == nil then
+        StarterGui:SetCore("SendNotification", {
+            Title = "USERNAME NOT DETECTED";
+            Text = "Enter a valid Roblox username first!";
+            Duration = 4;
+        })
+        return
+    end
+    acceptEnabled = not acceptEnabled
+    toggleSwitch(AcceptKnob, AcceptFill, AcceptDot, AcceptStatus, AcceptTrackStroke, AcceptTrack, AcceptRipple, acceptEnabled)
+end)
+
+-- =====================================================
+-- GLOBAL USERNAME LOOKUP
+-- =====================================================
+
+local function resetToggles()
+    if stealEnabled then
+        stealEnabled = false
+        toggleSwitch(StealKnob, StealFill, StealDot, StealStatus, StealTrackStroke, StealTrack, StealRipple, false)
+    end
+    if acceptEnabled then
+        acceptEnabled = false
+        toggleSwitch(AcceptKnob, AcceptFill, AcceptDot, AcceptStatus, AcceptTrackStroke, AcceptTrack, AcceptRipple, false)
+    end
+end
+
+local function resetProfile()
+    ProfilePic.Image = ""
+    StatusIndicator.Text = "?"
+    StatusIndicator.TextColor3 = Color3.fromRGB(100, 90, 150)
+    StatusIndicator.Visible = true
+    targetUserId = nil
+    targetUsername = ""
+    resetToggles()
+end
+
+local function lookupUsername(username)
+    if username == "" then
+        resetProfile()
+        return
+    end
+
+    StatusIndicator.Text = "..."
+    StatusIndicator.TextColor3 = Color3.fromRGB(180, 170, 100)
+    StatusIndicator.Visible = true
+    ProfilePic.Image = ""
+
+    task.spawn(function()
+        local success, userId = pcall(function()
+            return Players:GetUserIdFromNameAsync(username)
+        end)
+
+        if UsernameBox.Text:lower() ~= username:lower() then return end
+
+        if success and userId then
+            targetUserId = userId
+            targetUsername = username
+            ProfilePic.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
+            StatusIndicator.Visible = false
+            TweenService:Create(PicStroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(90, 200, 120)}):Play()
+        else
+            resetProfile()
+            StatusIndicator.Text = "✗"
+            StatusIndicator.TextColor3 = Color3.fromRGB(220, 80, 80)
+            StatusIndicator.Visible = true
+            TweenService:Create(PicStroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(200, 60, 60)}):Play()
+        end
+    end)
+end
+
+local lastText = ""
+UsernameBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local current = UsernameBox.Text
+    lastText = current
+    TweenService:Create(PicStroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(80, 65, 160)}):Play()
+
+    if current == "" then
+        resetProfile()
+        return
+    end
+
+    task.delay(0.6, function()
+        if UsernameBox.Text == current then
+            lookupUsername(current)
+        end
+    end)
+end)
+
+-- DIVIDER
+local Divider = Instance.new("Frame")
+Divider.Size = UDim2.new(1, -24, 0, 1)
+Divider.Position = UDim2.new(0, 12, 1, -52)
+Divider.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+Divider.BackgroundTransparency = 0.4
+Divider.BorderSizePixel = 0
+Divider.ZIndex = 3
+Divider.Parent = MainFrame
+
+-- BOTTOM WARNING
+local WarningText = Instance.new("TextLabel")
+WarningText.Size = UDim2.new(1, -24, 0, 14)
+WarningText.Position = UDim2.new(0, 12, 1, -46)
+WarningText.TextXAlignment = Enum.TextXAlignment.Center
+WarningText.BackgroundTransparency = 1
+WarningText.Text = "MAKE SURE YOU ARE IN A TRADE BEFORE TURNING ON"
+WarningText.Font = Enum.Font.Gotham
+WarningText.TextSize = 8
+WarningText.TextColor3 = Color3.fromRGB(120, 110, 150)
+WarningText.TextWrapped = true
+WarningText.ZIndex = 3
+WarningText.Parent = MainFrame
+
+-- =====================================================
+-- DRAG SYSTEM (MOBILE & PC)
+-- Copied from original working script pattern
+-- =====================================================
+
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        updateDrag(input)
+    end
+end)
+
+-- =====================================================
+-- FLOATING TOGGLE CIRCLE
+-- Using exact same pattern as original working script:
+-- MouseButton1Click for toggle, InputBegan for drag
+-- =====================================================
+
+CircleToggle.MouseButton1Click:Connect(function()
+    guiVisible = not guiVisible
+    MainFrame.Visible = guiVisible
+    CircleToggle.BackgroundColor3 = guiVisible and Color3.fromRGB(35, 30, 55) or Color3.fromRGB(55, 45, 80)
+end)
+
+local circleDragging = false
+local circleInput = nil
+local circleStart = nil
+local circlePos = nil
+
+CircleToggle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+       input.UserInputType == Enum.UserInputType.Touch then
+        circleDragging = true
+        circleStart = input.Position
+        circlePos = CircleToggle.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                circleDragging = false
+            end
+        end)
+    end
+end)
+
+CircleToggle.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or
+       input.UserInputType == Enum.UserInputType.Touch then
+        circleInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if circleDragging and input == circleInput then
+        local delta = input.Position - circleStart
+        CircleToggle.Position = UDim2.new(
+            circlePos.X.Scale,
+            circlePos.X.Offset + delta.X,
+            circlePos.Y.Scale,
+            circlePos.Y.Offset + delta.Y
+        )
+    end
+end)
