@@ -1,0 +1,151 @@
+-- =========================
+-- FUNÇÕES BASE (Lucky Block)
+-- =========================
+
+local function isLuckyBlock(obj)
+    local parent = obj.Parent
+    
+    if parent then
+        for _, v in pairs(parent:GetDescendants()) do
+            if v:IsA("TextLabel") or v:IsA("TextButton") then
+                if string.find(v.Text, "Lucky Block") then
+                    return true
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+local function isLuckyModel(model)
+    return model and model:IsA("Model") and model.Name:lower():find("lucky")
+end
+
+-- =========================
+-- 1. GLOW SUAVE (MODELOS)
+-- =========================
+
+local function applyGlow(model)
+    if not isLuckyModel(model) then return end
+    if model:FindFirstChild("OG_DONE") then return end
+
+    local tag = Instance.new("BoolValue")
+    tag.Name = "OG_DONE"
+    tag.Parent = model
+
+    for _,part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local light = Instance.new("PointLight")
+            light.Name = "OGGlow"
+            light.Color = Color3.fromRGB(255, 220, 120)
+            light.Brightness = 0.8
+            light.Range = 6
+            light.Parent = part
+        end
+    end
+end
+
+-- =========================
+-- 2. PREÇO LUCKY ($750M → $500B)
+-- =========================
+
+local function changePrice(obj)
+    if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and isLuckyBlock(obj) then
+        obj.Text = obj.Text:gsub("%$750[Mm]", "$500B")
+    end
+end
+
+-- =========================
+-- 3. VENDA ($375M → $250B)
+-- =========================
+
+local function applyPrompt(prompt)
+    if prompt:IsA("ProximityPrompt") then
+        local function update()
+            if prompt.ActionText and string.find(prompt.ActionText, "$375") then
+                prompt.ActionText = prompt.ActionText:gsub("%$375[Mm]", "$250B")
+            end
+        end
+
+        update()
+        prompt:GetPropertyChangedSignal("ActionText"):Connect(update)
+    end
+end
+
+-- =========================
+-- 4. REMOVER GOLD / DIAMOND / DIVINE
+-- =========================
+
+local function isLuckyUI(obj)
+    local parent = obj.Parent
+    if not parent then return false end
+
+    for _,v in ipairs(parent:GetChildren()) do
+        if v:IsA("TextLabel") and v.Text == "Lucky Block" then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function removeNames(obj)
+    if not obj:IsA("TextLabel") then return end
+
+    local function update()
+        if not isLuckyUI(obj) then return end
+
+        local t = obj.Text:lower()
+        if t:find("gold") or t:find("divine") or t:find("diamond") then
+            obj.Text = ""
+        end
+    end
+
+    update()
+    obj:GetPropertyChangedSignal("Text"):Connect(update)
+end
+
+-- =========================
+-- 5. SECRET → OG (ESTILO)
+-- =========================
+
+local function changeSecret(obj)
+    if (obj:IsA("TextLabel") or obj:IsA("TextButton")) then
+        if string.find(obj.Text, "Secret") and isLuckyBlock(obj) then
+            obj.RichText = true
+
+            obj.Text = obj.Text:gsub(
+                "Secret",
+                "<font color='rgb(200,170,40)'>OG</font>"
+            )
+
+            obj.TextStrokeTransparency = 0
+            obj.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        end
+    end
+end
+
+-- =========================
+-- APLICAR EM TUDO
+-- =========================
+
+for _, v in pairs(game:GetDescendants()) do
+    applyGlow(v)
+    changePrice(v)
+    applyPrompt(v)
+    removeNames(v)
+    changeSecret(v)
+end
+
+-- =========================
+-- NOVOS ELEMENTOS (REALTIME)
+-- =========================
+
+game.DescendantAdded:Connect(function(v)
+    applyGlow(v)
+    changePrice(v)
+    applyPrompt(v)
+    removeNames(v)
+    changeSecret(v)
+end)
