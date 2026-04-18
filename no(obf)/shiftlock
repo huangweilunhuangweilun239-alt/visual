@@ -1,4 +1,4 @@
---obf link https://github.com/Baiyanscript/main/blob/main/shiftlock
+-- obf link https://github.com/Baiyanscript/main/blob/main/shiftlock
 
 local ref = cloneref or function(x)
 	return x;
