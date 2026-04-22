@@ -82,7 +82,7 @@ ToggleButton.Position = UDim2.new(1,-90,0,20)
 
 ToggleButton.BackgroundTransparency = 1
 
-ToggleButton.Image = "rbxassetid://95003172478442"
+ToggleButton.Image = "rbxassetid://70869600792415"
 
 ToggleButton.Parent = ScreenGui
 
